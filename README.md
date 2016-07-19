@@ -13,11 +13,10 @@ import log "github.com/gesquive/cli-log"
 
 func main() {
     SetLogLevel(LevelInfo)
-	Debugln("debug")
-	Infoln("info")
-	Warnln("warn")
-	Errorln("error")
-	Fatalln("fatal")
+	Debug("debug")
+	Info("info")
+	Warn("warn")
+	Error("error")
 }
 ```
 
@@ -25,7 +24,6 @@ func main() {
 info
 warn
 error
-fatal
 ```
 
 ## License

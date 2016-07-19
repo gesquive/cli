@@ -3,6 +3,31 @@ package clilog
 import "fmt"
 import "io"
 import "os"
+import "github.com/fatih/color"
+
+// SprintfYellow creates a yellow formatted string
+var SprintfYellow = color.New(color.FgHiYellow).SprintfFunc()
+
+// SprintfGreen creates a green formatted string
+var SprintfGreen = color.New(color.FgHiGreen).SprintfFunc()
+
+// SprintfBlue creates a blue formatted string
+var SprintfBlue = color.New(color.FgHiBlue).SprintfFunc()
+
+// SprintfRed creates a red formatted string
+var SprintfRed = color.New(color.FgHiRed).SprintfFunc()
+
+// Yellow creates a yellow string
+var Yellow = SprintfYellow
+
+// Green creates a green string
+var Green = SprintfGreen
+
+// Blue creates a blue string
+var Blue = SprintfBlue
+
+// Red creates a red string
+var Red = SprintfRed
 
 // Log levels go in order: Debug, Info, Warn, Error, Fatal
 const (
@@ -32,34 +57,40 @@ func SetErrorWriter(w io.Writer) {
 	errWriter = w
 }
 
-// Debug logs a debug level message
-func Debug(a ...interface{}) {
-	logMessage(LevelDebug, outWriter, fmt.Sprint(a...))
+// SetColor sets the color status. True for color, False for no color
+func SetColor(colorOn bool) {
+	color.NoColor = !colorOn
 }
 
-// Info logs an info level message
-func Info(a ...interface{}) {
-	logMessage(LevelInfo, outWriter, fmt.Sprint(a...))
+// Debug logs a formatted debug level message with a newline appended
+func Debug(format string, a ...interface{}) {
+	logMessage(LevelDebug, outWriter, fmt.Sprintln(SprintfBlue(format, a...)))
 }
 
-// Warn logs a warning level message
-func Warn(a ...interface{}) {
-	logMessage(LevelWarn, outWriter, fmt.Sprint(a...))
+// Info logs a formatted info level message with a newline appended
+func Info(format string, a ...interface{}) {
+	logMessage(LevelInfo, outWriter, fmt.Sprintln(fmt.Sprintf(format, a...)))
 }
 
-// Error logs an error level message
-func Error(a ...interface{}) {
-	logMessage(LevelError, errWriter, fmt.Sprint(a...))
+// Warn logs a formatted warning level message with a newline appended
+func Warn(format string, a ...interface{}) {
+	logMessage(LevelWarn, outWriter, fmt.Sprintln(SprintfYellow(format, a...)))
 }
 
-// Fatal logs a fatal level message
-func Fatal(a ...interface{}) {
-	logMessage(LevelFatal, errWriter, fmt.Sprint(a...))
+// Error logs a formatted error level message with a newline appended
+func Error(format string, a ...interface{}) {
+	logMessage(LevelError, errWriter, fmt.Sprintln(SprintfRed(format, a...)))
+}
+
+// Fatal logs a formatted fatal level message with a newline appended and calls os.Exit(1)
+func Fatal(format string, a ...interface{}) {
+	logMessage(LevelFatal, errWriter, fmt.Sprintln(SprintfRed(format, a...)))
+	os.Exit(1)
 }
 
 // Debugf logs a formatted debug level message
 func Debugf(format string, a ...interface{}) {
-	logMessage(LevelDebug, outWriter, fmt.Sprintf(format, a...))
+	logMessage(LevelDebug, outWriter, SprintfBlue(format, a...))
 }
 
 // Infof logs a formatted info level message
@@ -69,22 +100,23 @@ func Infof(format string, a ...interface{}) {
 
 // Warnf logs a formatted warning level message
 func Warnf(format string, a ...interface{}) {
-	logMessage(LevelWarn, outWriter, fmt.Sprintf(format, a...))
+	logMessage(LevelWarn, outWriter, SprintfYellow(format, a...))
 }
 
 // Errorf logs a formatted error level message
 func Errorf(format string, a ...interface{}) {
-	logMessage(LevelError, errWriter, fmt.Sprintf(format, a...))
+	logMessage(LevelError, errWriter, SprintfRed(format, a...))
 }
 
-// Fatalf logs a formatted fatal level message
+// Fatalf logs a formatted fatal level message and calls os.Exit(1)
 func Fatalf(format string, a ...interface{}) {
-	logMessage(LevelFatal, errWriter, fmt.Sprintf(format, a...))
+	logMessage(LevelFatal, errWriter, SprintfRed(format, a...))
+	os.Exit(1)
 }
 
 // Debugln logs a debug level message with a newline appended
 func Debugln(a ...interface{}) {
-	logMessage(LevelDebug, outWriter, fmt.Sprintln(a...))
+	logMessage(LevelDebug, outWriter, SprintfBlue(fmt.Sprintln(a...)))
 }
 
 // Infoln logs an info level message with a newline appended
@@ -94,17 +126,18 @@ func Infoln(a ...interface{}) {
 
 // Warnln logs a warning level message with a newline appended
 func Warnln(a ...interface{}) {
-	logMessage(LevelWarn, outWriter, fmt.Sprintln(a...))
+	logMessage(LevelWarn, outWriter, SprintfYellow(fmt.Sprintln(a...)))
 }
 
 // Errorln logs an error level message with a newline appended
 func Errorln(a ...interface{}) {
-	logMessage(LevelError, errWriter, fmt.Sprintln(a...))
+	logMessage(LevelError, errWriter, SprintfRed(fmt.Sprintln(a...)))
 }
 
-// Fatalln logs a fatal level message with a newline appended
+// Fatalln logs a fatal level message with a newline appended and calls os.Exit(1)
 func Fatalln(a ...interface{}) {
-	logMessage(LevelFatal, errWriter, fmt.Sprintln(a...))
+	logMessage(LevelFatal, errWriter, SprintfRed(fmt.Sprintln(a...)))
+	os.Exit(1)
 }
 
 func logMessage(level int, writer io.Writer, message string) {
