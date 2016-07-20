@@ -9,14 +9,14 @@ I consistently needed a simple output printer for my console projects that was s
 ```
 package main
 
-import log "github.com/gesquive/cli-log"
+import cli "github.com/gesquive/cli-log"
 
 func main() {
-    SetLogLevel(LevelInfo)
-	Debug("debug")
-	Info("info")
-	Warn("warn")
-	Error("error")
+    cli.SetLogLevel(cli.LevelInfo)
+	cli.Debug("debug")
+	cli.Info("info")
+	cli.Warn("warn")
+	cli.Error("error")
 }
 ```
 
