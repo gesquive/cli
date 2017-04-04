@@ -1,18 +1,25 @@
-# cli-log
+# cli
 
-I consistently needed a simple output printer for my console projects that was simple and did not require a lot of setup. Since I couldn't find a package like this, I just wrote this quickly for myself.
+I consistently needed a simple output printer for my console projects that did not require a lot of setup. Since I couldn't find a library to fill this role, I just wrote this project quickly for myself.
+
+Features include:
+ - cross-platform colored output
+ - automatic tty detection
+ - leveled logging
+
+This library is not meant to be a comprehensive logging library. If you need a more comprehensive logging library, I highly recommend [Logrus](https://github.com/Sirupsen/logrus)
 
 ## Usage
 
 #### example.go
 
-```
+```go
 package main
 
-import cli "github.com/gesquive/cli-log"
+import "github.com/gesquive/cli"
 
 func main() {
-    cli.SetLogLevel(cli.LevelInfo)
+	cli.SetLogLevel(cli.LevelInfo)
 	cli.Debug("debug")
 	cli.Info("info")
 	cli.Warn("warn")
@@ -21,6 +28,7 @@ func main() {
 ```
 
 ```
+debug
 info
 warn
 error

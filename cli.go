@@ -1,4 +1,4 @@
-package clilog
+package cli
 
 import "fmt"
 import "io"
