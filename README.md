@@ -5,9 +5,9 @@ I consistently needed a simple output printer for my console projects that did n
 Features include:
  - cross-platform colored output
  - automatic tty detection
- - leveled logging
+ - leveled printing
 
-This library is not meant to be a comprehensive logging library. If you need a more comprehensive logging library, I highly recommend [Logrus](https://github.com/Sirupsen/logrus)
+This library is not meant to be a comprehensive logging library. If you need more out of your logging library, I recommend [Logrus](https://github.com/Sirupsen/logrus).
 
 ## Usage
 
@@ -19,7 +19,7 @@ package main
 import "github.com/gesquive/cli"
 
 func main() {
-	cli.SetLogLevel(cli.LevelInfo)
+	cli.SetPrintLevel(cli.LevelInfo)
 	cli.Debug("debug")
 	cli.Info("info")
 	cli.Warn("warn")
