@@ -1,9 +1,13 @@
 package cli
 
-import "fmt"
-import "io"
-import "os"
-import "github.com/fatih/color"
+import (
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/fatih/color"
+	"github.com/mattn/go-colorable"
+)
 
 // SprintfYellow creates a yellow formatted string
 var SprintfYellow = color.New(color.FgHiYellow).SprintfFunc()
@@ -39,8 +43,8 @@ const (
 )
 
 var printLevel = LevelInfo
-var outWriter io.Writer = os.Stdout
-var errWriter io.Writer = os.Stderr
+var outWriter io.Writer = colorable.NewColorableStdout()
+var errWriter io.Writer = colorable.NewColorableStderr()
 
 // SetPrintLevel allows you to set the level to print, by default LevelInfo is set
 func SetPrintLevel(level int) {
