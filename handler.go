@@ -14,17 +14,50 @@ import (
 	"strings"
 	"time"
 	"unicode"
-
-	"github.com/fatih/color"
 )
 
-var fprintStd = color.New().FprintFunc()
-var fprintDebug = color.New(color.FgBlue).FprintFunc()
-var fprintInfo = color.New().FprintFunc()
-var fprintWarn = color.New(color.FgYellow).FprintFunc()
-var fprintError = color.New(color.FgRed).FprintFunc()
-var fprintAttr = color.New(color.Faint).FprintFunc()
-var fprintAttrError = color.New(color.FgRed).Add(color.Faint).FprintFunc()
+type cliColor string
+
+// These consts are based off of
+//  https://gist.github.com/JBlond/2fea43a3049b38287e5e9cefc87b2124
+
+// Base attributes
+const (
+	cliReset        = cliColor("\033[0m")
+	cliBold         = cliColor("\033[1m")
+	cliFaint        = cliColor("\033[2m")
+	cliItalic       = cliColor("\033[3m")
+	cliUnderline    = cliColor("\033[4m")
+	cliBlinkSlow    = cliColor("\033[5m")
+	cliBlinkRapid   = cliColor("\033[6m")
+	cliReverseVideo = cliColor("\033[7m")
+	cliConcealed    = cliColor("\033[8m")
+	cliCrossedOut   = cliColor("\033[9m")
+)
+
+// Foreground text colors
+const (
+	cliFgBlack   = cliColor("\033[30m")
+	cliFgRed     = cliColor("\033[31m")
+	cliFgGreen   = cliColor("\033[32m")
+	cliFgYellow  = cliColor("\033[33m")
+	cliFgBlue    = cliColor("\033[34m")
+	cliFgMagenta = cliColor("\033[35m")
+	cliFgCyan    = cliColor("\033[36m")
+	cliFgWhite   = cliColor("\033[37m")
+)
+
+// Foreground Hi-Intensity text colors
+const (
+	cliFgHiBlack   = cliColor("\033[90m")
+	cliFgHiRed     = cliColor("\033[91m")
+	cliFgHiGreen   = cliColor("\033[92m")
+	cliFgHiYellow  = cliColor("\033[93m")
+	cliFgHiBlue    = cliColor("\033[94m")
+	cliFgHiMagenta = cliColor("\033[95m")
+	cliFgHiCyan    = cliColor("\033[96m")
+	cliFgHiWhite   = cliColor("\033[97m")
+)
 
 // HandlerOptions is a drop in replacement for [slog.HandlerOptions]
 type HandlerOptions struct {
@@ -67,17 +100,17 @@ type HandlerOptions struct {
 	ReplaceAttr func(groups []string, a slog.Attr) slog.Attr
 
 	// Time format (Default: time.DateTime)
-	TimeFormat  string
+	TimeFormat string
 
 	// Disable color (Default: false)
-	NoColor     bool   
+	NoColor bool
 }
 
-var defaultLevel      = slog.LevelInfo
+var defaultLevel = slog.LevelInfo
 var defaultTimeFormat = time.DateTime
 
 type Handler struct {
-	h slog.Handler
+	h      slog.Handler
 	logger *log.Logger
 
 	attrsPrefix string
@@ -97,16 +130,16 @@ func NewCLIHandler(w io.Writer, opts *HandlerOptions) slog.Handler {
 	}
 	h := &Handler{
 		h: slog.NewTextHandler(w, &slog.HandlerOptions{
-			AddSource: opts.AddSource,
-			Level: opts.Level,
+			AddSource:   opts.AddSource,
+			Level:       opts.Level,
 			ReplaceAttr: opts.ReplaceAttr,
 		}),
-		logger: log.New(w, "", 0),
-		addSource: opts.AddSource,
-		level: defaultLevel,
+		logger:      log.New(w, "", 0),
+		addSource:   opts.AddSource,
+		level:       defaultLevel,
 		replaceAttr: opts.ReplaceAttr,
-		timeFormat: defaultTimeFormat,
-		noColor: opts.NoColor,
+		timeFormat:  defaultTimeFormat,
+		noColor:     opts.NoColor,
 	}
 
 	if opts.Level != nil {
@@ -115,14 +148,13 @@ func NewCLIHandler(w io.Writer, opts *HandlerOptions) slog.Handler {
 	if opts.TimeFormat != "" {
 		h.timeFormat = opts.TimeFormat
 	}
-	color.NoColor = opts.NoColor
 
 	return h
 }
 
 func (h *Handler) clone() *Handler {
 	return &Handler{
-		logger: log.New(h.logger.Writer(), "", 0),
+		logger:      log.New(h.logger.Writer(), "", 0),
 		attrsPrefix: h.attrsPrefix,
 		groupPrefix: h.groupPrefix,
 		groups:      h.groups,
@@ -135,7 +167,7 @@ func (h *Handler) clone() *Handler {
 }
 
 func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
-    return level >= h.level.Level()
+	return level >= h.level.Level()
 }
 
 func (h *Handler) SetLogLoggerLevel(level slog.Level) {
@@ -143,7 +175,8 @@ func (h *Handler) SetLogLoggerLevel(level slog.Level) {
 }
 
 func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
-	var buf strings.Builder
+	buf := newBuffer()
+	defer buf.Free()
 
 	// Built-in attributes. They are not in a group.
 	// stateGroups := state.groups
@@ -157,16 +190,16 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 			buf.WriteString(r.Time.Format(h.timeFormat))
 			buf.WriteByte(' ')
 		} else {
-			h.appendAttr(&buf, slog.Time(slog.TimeKey, val), h.groupPrefix, nil)
+			h.appendAttr(buf, slog.Time(slog.TimeKey, val), h.groupPrefix, nil)
 		}
 	}
 
 	// level
 	if rep == nil {
-		h.appendLevel(&buf, r.Level)
+		h.appendLevel(buf, r.Level)
 		buf.WriteByte(' ')
 	} else {
-		h.appendAttr(&buf, slog.Any(slog.LevelKey, r.Level), h.groupPrefix, nil)
+		h.appendAttr(buf, slog.Any(slog.LevelKey, r.Level), h.groupPrefix, nil)
 	}
 
 	// source
@@ -181,10 +214,10 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 			}
 
 			if rep == nil {
-				h.appendSource(&buf, src)
+				h.appendSource(buf, src)
 				buf.WriteByte(' ')
 			} else {
-				h.appendAttr(&buf, slog.Any(slog.SourceKey, src), h.groupPrefix, nil)
+				h.appendAttr(buf, slog.Any(slog.SourceKey, src), h.groupPrefix, nil)
 			}
 		}
 	}
@@ -194,18 +227,18 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		buf.WriteString(r.Message)
 		buf.WriteByte(' ')
 	} else {
-		h.appendAttr(&buf, slog.String(slog.MessageKey, r.Message), h.groupPrefix, nil)
+		h.appendAttr(buf, slog.String(slog.MessageKey, r.Message), h.groupPrefix, nil)
 	}
-	
+
 	// handler attributes
 	if len(h.attrsPrefix) > 0 {
 		buf.WriteString(h.attrsPrefix)
 	}
-	
+
 	// attributes
 	if r.NumAttrs() > 0 {
 		r.Attrs(func(attr slog.Attr) bool {
-			h.appendAttr(&buf, attr, h.groupPrefix, h.groups)
+			h.appendAttr(buf, attr, h.groupPrefix, h.groups)
 			return true
 		})
 	}
@@ -221,13 +254,14 @@ func (h *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 	h2 := h.clone()
 
-	var sb strings.Builder
+	buf := newBuffer()
+	defer buf.Free()
 
 	// write attributes to buffer
 	for _, attr := range attrs {
-		h2.appendAttr(&sb, attr, h2.groupPrefix, h2.groups)
+		h2.appendAttr(buf, attr, h2.groupPrefix, h2.groups)
 	}
-	h2.attrsPrefix = h.attrsPrefix + sb.String()
+	h2.attrsPrefix = h.attrsPrefix + buf.String()
 	return h2
 }
 
@@ -241,22 +275,28 @@ func (h *Handler) WithGroup(name string) slog.Handler {
 	return h2
 }
 
-func (h *Handler) appendLevel(buf *strings.Builder, level slog.Level) {
+func (h *Handler) appendLevel(buf *buffer, level slog.Level) {
 	switch level {
 	case slog.LevelDebug:
-		fprintDebug(buf, level.String())
+		h.appendANSI(buf, cliFgBlue)
+		buf.WriteString("DEBUG")
+		h.appendANSI(buf, cliReset)
 	case slog.LevelInfo:
-		fprintInfo(buf, level.String(), " ")
+		buf.WriteString("INFO ")
 	case slog.LevelWarn:
-		fprintWarn(buf, level.String(), " ")
+		h.appendANSI(buf, cliFgYellow)
+		buf.WriteString("WARN ")
+		h.appendANSI(buf, cliReset)
 	case slog.LevelError:
-		fprintError(buf, level.String())
+		h.appendANSI(buf, cliFgRed)
+		buf.WriteString("ERROR")
+		h.appendANSI(buf, cliReset)
 	default:
 		buf.WriteString(level.String())
 	}
 }
 
-func (h *Handler) appendAttr(buf *strings.Builder, attr slog.Attr, groupsPrefix string, groups []string) {
+func (h *Handler) appendAttr(buf *buffer, attr slog.Attr, groupsPrefix string, groups []string) {
 	if h.replaceAttr != nil && attr.Value.Kind() != slog.KindGroup {
 		// Resolve before calling ReplaceAttr, so the user doesn't have to.
 		attr.Value = attr.Value.Resolve()
@@ -264,8 +304,7 @@ func (h *Handler) appendAttr(buf *strings.Builder, attr slog.Attr, groupsPrefix 
 	}
 	attr.Value = attr.Value.Resolve()
 
-	// if attr.Equal(slog.Attr{}) || attr.Equal(slog.Any("", nil)) {
-	if attr.Key == "" && attr.Value.Any() == nil {
+	if attr.Equal(slog.Any("", nil)) {
 		return
 	}
 
@@ -300,19 +339,21 @@ func (h *Handler) appendAttr(buf *strings.Builder, attr slog.Attr, groupsPrefix 
 	}
 }
 
-func (h *Handler) appendKey(buf *strings.Builder, key, groups string) {
+func (h *Handler) appendKey(buf *buffer, key, groups string) {
+	h.appendANSI(buf, cliFaint)
 	if len(key) == 0 {
-		appendString(buf, fprintAttr, "\"\"")
+		buf.WriteString("\"\"")
 	} else {
-		appendAutoQuote(buf, fprintAttr, groups, key)
+		appendAutoQuote(buf, groups+key) //TODO: simplify this
 	}
-	appendString(buf, fprintAttr, "=")
+	buf.WriteByte('=')
+	h.appendANSI(buf, cliReset)
 }
 
-func (h *Handler) appendValue(buf *strings.Builder, v slog.Value) {
+func (h *Handler) appendValue(buf *buffer, v slog.Value) {
 	switch v.Kind() {
 	case slog.KindString:
-		appendQuote(buf, fprintStd, v.String())
+		appendQuote(buf, v.String())
 	case slog.KindInt64:
 		buf.Write(strconv.AppendInt(nil, v.Int64(), 10))
 	case slog.KindUint64:
@@ -322,9 +363,9 @@ func (h *Handler) appendValue(buf *strings.Builder, v slog.Value) {
 	case slog.KindBool:
 		buf.Write(strconv.AppendBool(nil, v.Bool()))
 	case slog.KindDuration:
-		appendQuote(buf, fprintStd, v.Duration().String())
+		appendQuote(buf, v.Duration().String())
 	case slog.KindTime:
-		appendQuote(buf, fprintStd, v.Time().String())
+		appendQuote(buf, v.Time().String())
 	case slog.KindAny:
 		switch cv := v.Any().(type) {
 		case slog.Level:
@@ -334,17 +375,17 @@ func (h *Handler) appendValue(buf *strings.Builder, v slog.Value) {
 			if err != nil {
 				break
 			}
-			appendQuote(buf, fprintStd, string(data))
+			appendQuote(buf, string(data))
 		case *slog.Source:
 			h.appendSource(buf, cv)
 		case []byte:
-			appendAutoQuote(buf, fprintStd, string(cv))
+			appendAutoQuote(buf, string(cv))
 		default:
 			// Like Printf's %s, we allow both the slice type and the byte element type to be named.
 			t := reflect.TypeOf(v.Any())
 			if t == nil {
-				appendAutoQuote(buf, fprintStd, v.Any())
-			} else if t.Kind() ==  reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
+				appendAutoQuote(buf, v.Any().(string))
+			} else if t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
 				fmt.Fprintf(buf, "\"%s\"", v.Any())
 			} else {
 				// fmt.Fprint(buf, strconv.Quote(v.Any().(string)))
@@ -354,73 +395,64 @@ func (h *Handler) appendValue(buf *strings.Builder, v slog.Value) {
 	}
 }
 
-func (h *Handler) appendError(buf *strings.Builder, err error, attrKey, groupsPrefix string) {
-	appendAutoQuote(buf, fprintAttrError, groupsPrefix, attrKey)
-	appendString(buf, fprintAttrError, "=")
-	appendQuote(buf, fprintStd, err.Error())
+func (h *Handler) appendError(buf *buffer, err error, attrKey, groupsPrefix string) {
+	h.appendANSI(buf, cliFaint)
+	h.appendANSI(buf, cliFgRed)
+	appendAutoQuote(buf, groupsPrefix+attrKey)
+	buf.WriteByte('=')
+	h.appendANSI(buf, cliReset)
+	appendQuote(buf, err.Error())
 }
 
-func (h *Handler) appendSource(buf *strings.Builder, src *slog.Source) {
+func (h *Handler) appendSource(buf *buffer, src *slog.Source) {
 	dir, file := filepath.Split(src.File)
-	appendString(buf, fprintAttr, filepath.Join(filepath.Base(dir), file), ":", strconv.Itoa(src.Line))
+
+	h.appendANSI(buf, cliFaint)
+	buf.WriteString(filepath.Join(filepath.Base(dir), file))
+	buf.WriteByte(':')
+	buf.WriteString(strconv.Itoa(src.Line))
+	h.appendANSI(buf, cliReset)
 }
 
-type fPrintFunc func(w io.Writer, a ...interface{}) //(n int, err error)
-
-//appendString formats using the default formats for its operands and writes to buf.
-// Spaces are added between operands when neither is a string.
-func appendString(buf *strings.Builder, fprint fPrintFunc, a ...interface{}) {
-	fprint(buf, a...)
-}
-
-//appendQuote wraps the resulting string in quotes
-func appendQuote(buf *strings.Builder, fprint fPrintFunc, a ...interface{}) {
-	var sb strings.Builder
-	prevString := false
-	for argNum, arg := range a {
-		isString := arg != nil && reflect.TypeOf(arg).Kind() == reflect.String
-		// Add a space between two non-string arguments.
-		if argNum > 0 && !isString && !prevString {
-			fmt.Fprint(&sb, " ")
-		}
-		fmt.Fprint(&sb, arg.(string))
-		prevString = isString
+func (h *Handler) appendANSI(buf *buffer, color cliColor) {
+	if !h.noColor {
+		buf.WriteString(string(color))
 	}
-	fprint(buf, strconv.Quote(sb.String()))
 }
 
-//appendAutoQuote will append a string with quotes if the string has spaces, quotes,
+// appendString formats using the default formats for its operands and writes to buf.
+func appendString(buf *buffer, s string) {
+	buf.WriteString(s)
+}
+
+// appendQuote wraps the resulting string in quotes
+func appendQuote(buf *buffer, s string) {
+	*buf = strconv.AppendQuote(*buf, s)
+}
+
+// appendAutoQuote will append a string with quotes if the string has spaces, quotes,
 // or unprintable characters
-func appendAutoQuote(buf *strings.Builder, fprint fPrintFunc, a ...interface{}) {
-	if needsQuotes(a...) {
-		appendQuote(buf, fprint, a...)
+func appendAutoQuote(buf *buffer, s string) {
+	if needsQuotes(s) {
+		appendQuote(buf, s)
 	} else {
-		appendString(buf, fprint, a...)
+		appendString(buf, s)
 	}
 }
 
-func needsQuotes(a ...interface{}) bool {
-	if len(a) == 0 {
+func needsQuotes(s string) bool {
+	if len(s) == 0 {
 		return true
 	}
 
-	prevString := false
-	for argNum, arg := range a {
-		if arg == nil {
-			continue
+	for _, r := range s {
+		switch r {
+		case ' ', '"', '=', '\t', '\n', '\v', '\f', '\r', 0x85, 0xA0:
+			return true
 		}
-		isString := reflect.TypeOf(arg).Kind() == reflect.String
-		if argNum > 0 && !isString && !prevString {
-			return true // appendString would have added a space between these two
+		if !unicode.IsPrint(r) {
+			return true
 		}
-		for _, r := range arg.(string) {
-			if unicode.IsSpace(r) || r == '"' || r == '=' || !unicode.IsPrint(r) {
-				return true
-			}
-		}
-		prevString = isString
 	}
 	return false
-
-
 }
