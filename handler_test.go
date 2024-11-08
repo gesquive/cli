@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"runtime"
+	"strconv"
 
 	"log/slog"
 	"path/filepath"
@@ -290,7 +291,7 @@ func TestCLIHandler(t *testing.T) {
 			name:     "GroupValue as Attr value",
 			replace:  removeKeys(slog.TimeKey, slog.LevelKey),
 			attrs:    []slog.Attr{{"v", slog.AnyValue(slog.IntValue(3))}},
-			wantText: "message v=\"3\"",
+			wantText: "message v=3",
 		},
 		{
 			name:     "byte slice",
@@ -327,10 +328,16 @@ func TestCLIHandler(t *testing.T) {
 			addSource: true,
 			wantText:  `handler_test.go:$LINE message`,
 		},
+		{
+			name:     "errors",
+			replace:  removeKeys(slog.TimeKey, slog.LevelKey),
+			attrs:    []slog.Attr{slog.Any("err", testError)},
+			wantText: `message err="fail"`,
+		},
 	} {
 		r := slog.NewRecord(testTime, slog.LevelInfo, "message", callerPC(2))
-		// line := strconv.Itoa(r.source().Line)
-		line := "334" //hacky but this should match the line where the record was made
+		_, _, line, _ := runtime.Caller(0)
+		sline := strconv.Itoa(line-1)
 		r.AddAttrs(test.attrs...)
 		var buf bytes.Buffer
 		opts := HandlerOptions{
@@ -348,7 +355,7 @@ func TestCLIHandler(t *testing.T) {
 			if err := h.Handle(ctx, r); err != nil {
 				t.Fatal(err)
 			}
-			want := strings.ReplaceAll(test.wantText, "$LINE", line)
+			want := strings.ReplaceAll(test.wantText, "$LINE", sline)
 			got := strings.TrimSuffix(buf.String(), "\n")
 			if got != want {
 				t.Errorf("\ngot  %s\nwant %s\n", got, want)
