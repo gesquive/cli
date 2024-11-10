@@ -114,7 +114,7 @@ func TestBasicAttrs(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var buf strings.Builder
-			var h slog.Handler = NewCLIHandler(&buf, &HandlerOptions{NoColor: true})
+			var h slog.Handler = NewHandler(&buf, &HandlerOptions{NoColor: true})
 			if test.with != nil {
 				h = test.with(h)
 			}
@@ -347,7 +347,7 @@ func TestCLIHandler(t *testing.T) {
 		}
 
 		t.Run(test.name, func(t *testing.T) {
-			h := NewCLIHandler(&buf, &opts)
+			h := NewHandler(&buf, &opts)
 			if test.with != nil {
 				h = test.with(h)
 			}
@@ -553,7 +553,7 @@ func BenchmarkAttrs(b *testing.B) {
 		skipRace bool
 	}{
 		{"disabled", disabledHandler{}, false},
-		{"cli", NewCLIHandler(io.Discard, nil), false},
+		{"cli", NewHandler(io.Discard, nil), false},
 		{"text", slog.NewTextHandler(io.Discard, nil), false},
 		{"json", slog.NewJSONHandler(io.Discard, nil), false},
 	} {

@@ -127,7 +127,7 @@ type Handler struct {
 	noColor     bool
 }
 
-func NewCLIHandler(w io.Writer, opts *HandlerOptions) slog.Handler {
+func NewHandler(w io.Writer, opts *HandlerOptions) slog.Handler {
 	f, hasFd := w.(*os.File)
 	if hasFd {
 		w = colorable.NewColorable(f)
