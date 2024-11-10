@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -14,6 +15,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/mattn/go-colorable"
 )
 
 type cliColor string
@@ -125,6 +128,11 @@ type Handler struct {
 }
 
 func NewCLIHandler(w io.Writer, opts *HandlerOptions) slog.Handler {
+	f, hasFd := w.(*os.File)
+	if hasFd {
+		w = colorable.NewColorable(f)
+	}
+
 	if opts == nil {
 		opts = &HandlerOptions{}
 	}
