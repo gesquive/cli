@@ -290,10 +290,10 @@ func (h *Handler) appendLevel(buf *buffer, level slog.Level) {
 		buf.WriteString("DEBUG")
 		h.appendANSI(buf, cliReset)
 	case slog.LevelInfo:
-		buf.WriteString("INFO ")
+		buf.WriteString(" INFO")
 	case slog.LevelWarn:
 		h.appendANSI(buf, cliFgYellow)
-		buf.WriteString("WARN ")
+		buf.WriteString(" WARN")
 		h.appendANSI(buf, cliReset)
 	case slog.LevelError:
 		h.appendANSI(buf, cliFgRed)
