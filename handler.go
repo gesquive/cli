@@ -174,6 +174,12 @@ func (h *Handler) clone() *Handler {
 	}
 }
 
+func SetAsDefault(w io.Writer, opts *HandlerOptions) {
+	handler := NewHandler(w, opts)
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+}
+
 func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
 	return level >= h.level.Level()
 }
