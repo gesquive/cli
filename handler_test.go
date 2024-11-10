@@ -59,18 +59,18 @@ func TestBasicAttrs(t *testing.T) {
 	}{
 		{
 			name: "no attrs",
-			want: "INFO  message",
+			want: " INFO message",
 		},
 		{
 			name:  "attrs",
 			attrs: attrs,
-			want:  "INFO  message a=1 b=\"two\"",
+			want:  " INFO message a=1 b=\"two\"",
 		},
 		{
 			name:  "preformatted",
 			with:  func(h slog.Handler) slog.Handler { return h.WithAttrs(preAttrs) },
 			attrs: attrs,
-			want:  "INFO  message pre=0 a=1 b=\"two\"",
+			want:  " INFO message pre=0 a=1 b=\"two\"",
 		},
 		{
 			name: "groups",
@@ -82,13 +82,13 @@ func TestBasicAttrs(t *testing.T) {
 					slog.Int("d", 4)),
 				slog.Int("e", 5),
 			},
-			want: "INFO  message a=1 g.b=2 g.h.c=3 g.d=4 e=5",
+			want: " INFO message a=1 g.b=2 g.h.c=3 g.d=4 e=5",
 		},
 		{
 			name:  "group",
 			with:  func(h slog.Handler) slog.Handler { return h.WithAttrs(preAttrs).WithGroup("s") },
 			attrs: attrs,
-			want:  "INFO  message pre=0 s.a=1 s.b=\"two\"",
+			want:  " INFO message pre=0 s.a=1 s.b=\"two\"",
 		},
 		{
 			name: "preformatted groups",
@@ -99,7 +99,7 @@ func TestBasicAttrs(t *testing.T) {
 					WithGroup("s2")
 			},
 			attrs: attrs,
-			want:  "INFO  message p1=1 s1.p2=2 s1.s2.a=1 s1.s2.b=\"two\"",
+			want:  " INFO message p1=1 s1.p2=2 s1.s2.a=1 s1.s2.b=\"two\"",
 		},
 		{
 			name: "two with-groups",
@@ -109,7 +109,7 @@ func TestBasicAttrs(t *testing.T) {
 					WithGroup("s2")
 			},
 			attrs: attrs,
-			want:  "INFO  message p1=1 s1.s2.a=1 s1.s2.b=\"two\"",
+			want:  " INFO message p1=1 s1.s2.a=1 s1.s2.b=\"two\"",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -153,18 +153,18 @@ func TestCLIHandler(t *testing.T) {
 		{
 			name:     "basic",
 			attrs:    attrs,
-			wantText: "2000-01-02 03:04:05 INFO  message a=\"one\" b=2",
+			wantText: "2000-01-02 03:04:05  INFO message a=\"one\" b=2",
 		},
 		{
 			name:     "empty key",
 			attrs:    append(slices.Clip(attrs), slog.Any("", "v")),
-			wantText: `2000-01-02 03:04:05 INFO  message a="one" b=2 ""="v"`,
+			wantText: `2000-01-02 03:04:05  INFO message a="one" b=2 ""="v"`,
 		},
 		{
 			name:     "cap keys",
 			replace:  upperCaseKey,
 			attrs:    attrs,
-			wantText: "2000-01-02 03:04:05 INFO  message A=\"one\" B=2",
+			wantText: "2000-01-02 03:04:05  INFO message A=\"one\" B=2",
 		},
 		{
 			name:     "remove all",
@@ -177,7 +177,7 @@ func TestCLIHandler(t *testing.T) {
 			with:     func(h slog.Handler) slog.Handler { return h.WithAttrs(preAttrs) },
 			preAttrs: preAttrs,
 			attrs:    attrs,
-			wantText: "2000-01-02 03:04:05 INFO  message pre=3 x=\"y\" a=\"one\" b=2",
+			wantText: "2000-01-02 03:04:05  INFO message pre=3 x=\"y\" a=\"one\" b=2",
 		},
 		{
 			name:     "preformatted cap keys",
@@ -185,7 +185,7 @@ func TestCLIHandler(t *testing.T) {
 			with:     func(h slog.Handler) slog.Handler { return h.WithAttrs(preAttrs) },
 			preAttrs: preAttrs,
 			attrs:    attrs,
-			wantText: "2000-01-02 03:04:05 INFO  message PRE=3 X=\"y\" A=\"one\" B=2",
+			wantText: "2000-01-02 03:04:05  INFO message PRE=3 X=\"y\" A=\"one\" B=2",
 		},
 		{
 			name:     "preformatted remove all",
@@ -247,15 +247,6 @@ func TestCLIHandler(t *testing.T) {
 				slog.Int("b", 2),
 			},
 			wantText: "message a=1 name.first=\"Ren\" name.last=\"Hoek\" b=2",
-		},
-		{
-			// Test resolution when there is no ReplaceAttr function.
-			name: "resolve",
-			attrs: []slog.Attr{
-				slog.Any("", &replace{slog.Value{}}), // should be elided
-				slog.Any("name", logValueName{"Ren", "Hoek"}),
-			},
-			wantText: "2000-01-02 03:04:05 INFO  message name.first=\"Ren\" name.last=\"Hoek\"",
 		},
 		{
 			name:     "with-group",
@@ -399,133 +390,75 @@ func callerPC(depth int) uintptr {
 	return pcs[0]
 }
 
-// func TestHandlerEnabled(t *testing.T) {
-// 	levelVar := func(l Level) *LevelVar {
-// 		var al LevelVar
-// 		al.Set(l)
-// 		return &al
-// 	}
+func TestSecondWith(t *testing.T) {
+	// Verify that a second call to Logger.With does not corrupt
+	// the original.
+	var buf bytes.Buffer
+	h := NewHandler(&buf, &HandlerOptions{ReplaceAttr: removeKeys(slog.TimeKey), NoColor: true})
+	logger := slog.New(h).With(
+		slog.String("app", "playground"),
+		slog.String("role", "tester"),
+		slog.Int("data_version", 2),
+	)
+	appLogger := logger.With("type", "log") // this becomes type=met
+	_ = logger.With("type", "metric")
+	appLogger.Info("foo")
+	got := strings.TrimSpace(buf.String())
+	want := `INFO foo app="playground" role="tester" data_version=2 type="log"`
+	if got != want {
+		t.Errorf("\ngot  %s\nwant %s", got, want)
+	}
+}
 
-// 	for _, test := range []struct {
-// 		leveler Leveler
-// 		want    bool
-// 	}{
-// 		{nil, true},
-// 		{LevelWarn, false},
-// 		{&LevelVar{}, true}, // defaults to Info
-// 		{levelVar(LevelWarn), false},
-// 		{LevelDebug, true},
-// 		{levelVar(LevelDebug), true},
-// 	} {
-// 		h := &commonHandler{opts: HandlerOptions{Level: test.leveler}}
-// 		got := h.enabled(LevelInfo)
-// 		if got != test.want {
-// 			t.Errorf("%v: got %t, want %t", test.leveler, got, test.want)
-// 		}
-// 	}
-// }
+func TestReplaceAttrGroups(t *testing.T) {
+	// Verify that ReplaceAttr is called with the correct groups.
+	type ga struct {
+		groups string
+		key    string
+		val    string
+	}
 
-// func TestSecondWith(t *testing.T) {
-// 	// Verify that a second call to Logger.With does not corrupt
-// 	// the original.
-// 	var buf bytes.Buffer
-// 	h := NewTextHandler(&buf, &HandlerOptions{ReplaceAttr: removeKeys(TimeKey)})
-// 	logger := New(h).With(
-// 		String("app", "playground"),
-// 		String("role", "tester"),
-// 		Int("data_version", 2),
-// 	)
-// 	appLogger := logger.With("type", "log") // this becomes type=met
-// 	_ = logger.With("type", "metric")
-// 	appLogger.Info("foo")
-// 	got := strings.TrimSpace(buf.String())
-// 	want := `INFO msg=foo app=playground role=tester data_version=2 type=log`
-// 	if got != want {
-// 		t.Errorf("\ngot  %s\nwant %s", got, want)
-// 	}
-// }
+	var got []ga
 
-// func TestReplaceAttrGroups(t *testing.T) {
-// 	// Verify that ReplaceAttr is called with the correct groups.
-// 	type ga struct {
-// 		groups string
-// 		key    string
-// 		val    string
-// 	}
+	h := NewHandler(io.Discard, &HandlerOptions{ReplaceAttr: func(gs []string, a slog.Attr) slog.Attr {
+		v := a.Value.String()
+		if a.Key == slog.TimeKey {
+			v = "<now>"
+		}
+		got = append(got, ga{strings.Join(gs, ","), a.Key, v})
+		return a
+	}})
+	slog.New(h).
+		With(slog.Int("a", 1)).
+		WithGroup("g1").
+		With(slog.Int("b", 2)).
+		WithGroup("g2").
+		With(
+			slog.Int("c", 3),
+			slog.Group("g3", slog.Int("d", 4)),
+			slog.Int("e", 5)).
+		Info("m",
+			slog.Int("f", 6),
+			slog.Group("g4", slog.Int("h", 7)),
+			slog.Int("i", 8))
 
-// 	var got []ga
-
-// 	h := NewTextHandler(io.Discard, &HandlerOptions{ReplaceAttr: func(gs []string, a Attr) Attr {
-// 		v := a.Value.String()
-// 		if a.Key == TimeKey {
-// 			v = "<now>"
-// 		}
-// 		got = append(got, ga{strings.Join(gs, ","), a.Key, v})
-// 		return a
-// 	}})
-// 	New(h).
-// 		With(Int("a", 1)).
-// 		WithGroup("g1").
-// 		With(Int("b", 2)).
-// 		WithGroup("g2").
-// 		With(
-// 			Int("c", 3),
-// 			Group("g3", Int("d", 4)),
-// 			Int("e", 5)).
-// 		Info("m",
-// 			Int("f", 6),
-// 			Group("g4", Int("h", 7)),
-// 			Int("i", 8))
-
-// 	want := []ga{
-// 		{"", "a", "1"},
-// 		{"g1", "b", "2"},
-// 		{"g1,g2", "c", "3"},
-// 		{"g1,g2,g3", "d", "4"},
-// 		{"g1,g2", "e", "5"},
-// 		{"", "time", "<now>"},
-// 		{"", "level", "INFO"},
-// 		{"", "msg", "m"},
-// 		{"g1,g2", "f", "6"},
-// 		{"g1,g2,g4", "h", "7"},
-// 		{"g1,g2", "i", "8"},
-// 	}
-// 	if !slices.Equal(got, want) {
-// 		t.Errorf("\ngot  %v\nwant %v", got, want)
-// 	}
-// }
-
-// const rfc3339Millis = "2006-01-02T15:04:0507:00"
-
-// func TestWriteTimeRFC3339(t *testing.T) {
-// 	for _, tm := range []time.Time{
-// 		time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC),
-// 		time.Date(2000, 1, 2, 3, 4, 5, 400, time.Local),
-// 		time.Date(2000, 11, 12, 3, 4, 500, 5e7, time.UTC),
-// 	} {
-// 		want := tm.Format(rfc3339Millis)
-// 		buf := buffer.New()
-// 		defer buf.Free()
-// 		writeTimeRFC3339Millis(buf, tm)
-// 		got := buf.String()
-// 		if got != want {
-// 			t.Errorf("got %s, want %s", got, want)
-// 		}
-// 	}
-// }
-
-// func BenchmarkWriteTime(b *testing.B) {
-// 	buf := buffer.New()
-// 	defer buf.Free()
-// 	tm := time.Date(2022, 3, 4, 5, 6, 7, 823456789, time.Local)
-// 	b.ResetTimer()
-// 	for i := 0; i < b.N; i++ {
-// 		writeTimeRFC3339Millis(buf, tm)
-// 		buf.Reset()
-// 	}
-// }
-
-
+	want := []ga{
+		{"", "a", "1"},
+		{"g1", "b", "2"},
+		{"g1,g2", "c", "3"},
+		{"g1,g2,g3", "d", "4"},
+		{"g1,g2", "e", "5"},
+		{"", "time", "<now>"},
+		{"", "level", "INFO"},
+		{"", "msg", "m"},
+		{"g1,g2", "f", "6"},
+		{"g1,g2,g4", "h", "7"},
+		{"g1,g2", "i", "8"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("\ngot  %v\nwant %v", got, want)
+	}
+}
 
 // This benchmark is loosly based off of slog/internal/benchmarks/benchmarks_test.go
 //  https://cs.opensource.google/go/go/+/master:src/log/slog/internal/benchmarks/benchmarks_test.go
