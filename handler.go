@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -192,19 +191,16 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	buf := newBuffer()
 	defer buf.Free()
 
-	// Built-in attributes. They are not in a group.
-	// stateGroups := state.groups
-	// state.groups = nil // So ReplaceAttrs sees no groups instead of the pre groups.
 	rep := h.replaceAttr
 
 	// time
 	if !r.Time.IsZero() {
 		val := r.Time.Round(0) // strip monotonic to match Attr behavior
 		if rep == nil {
-			buf.WriteString(r.Time.Format(h.timeFormat))
+			*buf = r.Time.AppendFormat(*buf, h.timeFormat)
 			buf.WriteByte(' ')
 		} else {
-			h.appendAttr(buf, slog.Time(slog.TimeKey, val), h.groupPrefix, nil)
+			h.appendStd(buf, slog.Time(slog.TimeKey, val))
 		}
 	}
 
@@ -213,7 +209,7 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		h.appendLevel(buf, r.Level)
 		buf.WriteByte(' ')
 	} else {
-		h.appendAttr(buf, slog.Any(slog.LevelKey, r.Level), h.groupPrefix, nil)
+		h.appendStd(buf, slog.Any(slog.LevelKey, r.Level))
 	}
 
 	// source
@@ -231,7 +227,7 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 				h.appendSource(buf, src)
 				buf.WriteByte(' ')
 			} else {
-				h.appendAttr(buf, slog.Any(slog.SourceKey, src), h.groupPrefix, nil)
+				h.appendStd(buf, slog.Any(slog.SourceKey, src))
 			}
 		}
 	}
@@ -241,7 +237,7 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		buf.WriteString(r.Message)
 		buf.WriteByte(' ')
 	} else {
-		h.appendAttr(buf, slog.String(slog.MessageKey, r.Message), h.groupPrefix, nil)
+		h.appendStd(buf, slog.String(slog.MessageKey, r.Message))
 	}
 
 	// handler attributes
@@ -310,6 +306,31 @@ func (h *Handler) appendLevel(buf *buffer, level slog.Level) {
 	}
 }
 
+func (h *Handler) appendStd(buf *buffer, attr slog.Attr) {
+	if h.replaceAttr != nil {
+		attr = h.replaceAttr(nil, attr)
+	}
+
+	if attr.Key == "" {
+		return
+	}
+
+	key := strings.ToLower(attr.Key)
+	if key == slog.TimeKey {
+		buf.WriteString(attr.Value.Time().Format(h.timeFormat))
+		buf.WriteByte(' ')
+	} else if key == slog.LevelKey {
+		h.appendLevel(buf, attr.Value.Any().(slog.Level))
+		buf.WriteByte(' ')
+	} else if key == slog.SourceKey {
+		h.appendSource(buf, attr.Value.Any().(*slog.Source))
+		buf.WriteByte(' ')
+	} else if key == slog.MessageKey {
+		buf.WriteString(attr.Value.String())
+		buf.WriteByte(' ')
+	}
+}
+
 func (h *Handler) appendAttr(buf *buffer, attr slog.Attr, groupsPrefix string, groups []string) {
 	if h.replaceAttr != nil && attr.Value.Kind() != slog.KindGroup {
 		// Resolve before calling ReplaceAttr, so the user doesn't have to.
@@ -322,7 +343,6 @@ func (h *Handler) appendAttr(buf *buffer, attr slog.Attr, groupsPrefix string, g
 		return
 	}
 
-	key := strings.ToLower(attr.Key)
 	if attr.Value.Kind() == slog.KindGroup {
 		if attr.Key != "" {
 			groupsPrefix += attr.Key + "."
@@ -331,18 +351,6 @@ func (h *Handler) appendAttr(buf *buffer, attr slog.Attr, groupsPrefix string, g
 		for _, groupAttr := range attr.Value.Group() {
 			h.appendAttr(buf, groupAttr, groupsPrefix, groups)
 		}
-	} else if key == slog.TimeKey {
-		buf.WriteString(attr.Value.Time().Format(h.timeFormat))
-		buf.WriteByte(' ')
-	} else if key == slog.LevelKey {
-		h.appendLevel(buf, attr.Value.Any().(slog.Level))
-		buf.WriteByte(' ')
-	} else if key == slog.SourceKey {
-		h.appendSource(buf, attr.Value.Any().(*slog.Source))
-		buf.WriteByte(' ')
-	} else if key == slog.MessageKey {
-		buf.WriteString(attr.Value.String())
-		buf.WriteByte(' ')
 	} else if err, ok := attr.Value.Any().(error); ok {
 		h.appendError(buf, err, attr.Key, groupsPrefix)
 		buf.WriteByte(' ')
@@ -383,7 +391,7 @@ func (h *Handler) appendValue(buf *buffer, v slog.Value) {
 	case slog.KindAny:
 		switch cv := v.Any().(type) {
 		case slog.Level:
-			h.appendLevel(buf, cv)
+			buf.WriteString(v.String())
 		case encoding.TextMarshaler:
 			data, err := cv.MarshalText()
 			if err != nil {
@@ -395,16 +403,7 @@ func (h *Handler) appendValue(buf *buffer, v slog.Value) {
 		case []byte:
 			appendAutoQuote(buf, string(cv))
 		default:
-			// Like Printf's %s, we allow both the slice type and the byte element type to be named.
-			t := reflect.TypeOf(v.Any())
-			if t == nil {
-				appendAutoQuote(buf, v.Any().(string))
-			} else if t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
-				fmt.Fprintf(buf, "\"%s\"", v.Any())
-			} else {
-				// fmt.Fprint(buf, strconv.Quote(v.Any().(string)))
-				fmt.Fprintf(buf, "\"%s\"", v.Any())
-			}
+			appendQuote(buf, fmt.Sprintf("%s", v.Any()))
 		}
 	}
 }

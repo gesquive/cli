@@ -28,26 +28,19 @@ var (
 	testError    = errors.New("fail")
 )
 
-// var testAttrs = []slog.Attr{
-// 	slog.String("string", testString),
-// 	slog.Int("status", testInt),
-// 	slog.Duration("duration", testDuration),
-// 	slog.Time("time", testTime),
-// 	slog.Any("error", testError),
-// }
-
-// const wantText = "time=1651363200 level=0 msg=Test logging, but use a somewhat realistic message length. string=7e3b3b2aaeff56a7108fe11e154200dd/7819479873059528190 status=32768 duration=23000000000 time=1651363200 error=fail\n"
-
-
-type replace struct {
-	v slog.Value
+var testAttrs = []slog.Attr{
+	slog.String("string", testString),
+	slog.Int("status", testInt),
+	slog.Duration("duration", testDuration),
+	slog.Time("time", testTime),
+	slog.Any("error", testError),
 }
 
 
 // The next couple of tests are loosely based off of slog/handler_test.go
 //  https://cs.opensource.google/go/go/+/master:src/log/slog/handler_test.go
 
-func TestBasicAttrs(t *testing.T) {
+func TestAttrs(t *testing.T) {
 	ctx := context.Background()
 	preAttrs := []slog.Attr{slog.Int("pre", 0)}
 	attrs := []slog.Attr{slog.Int("a", 1), slog.String("b", "two")}
@@ -131,7 +124,6 @@ func TestBasicAttrs(t *testing.T) {
 	}
 }
 
-// Verify the common parts of TextHandler and JSONHandler.
 func TestCLIHandler(t *testing.T) {
 	ctx := context.Background()
 
@@ -171,6 +163,11 @@ func TestCLIHandler(t *testing.T) {
 			replace:  removeAll,
 			attrs:    attrs,
 			wantText: "",
+		},
+		{
+			name:     "attrs",
+			attrs:    testAttrs,
+			wantText: "2000-01-02 03:04:05  INFO message string=\"7e3b3b2aaeff56a7108fe11e154200dd/7819479873059528190\" status=32768 duration=\"23s\" time=\"2000-01-02 03:04:05.000000006 +0000 UTC\" error=\"fail\"",
 		},
 		{
 			name:     "preformatted",
