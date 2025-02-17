@@ -36,6 +36,14 @@ var testAttrs = []slog.Attr{
 	slog.Any("error", testError),
 }
 
+type TestStruct struct {
+	TestTime time.Time
+	TestString string
+	TestInt int
+	TestDuration time.Duration
+	TestError error
+	testPrivateString string
+}
 
 // The next couple of tests are loosely based off of slog/handler_test.go
 //  https://cs.opensource.google/go/go/+/master:src/log/slog/handler_test.go
@@ -292,6 +300,18 @@ func TestCLIHandler(t *testing.T) {
 			replace:  removeKeys(slog.TimeKey, slog.LevelKey),
 			attrs:    []slog.Attr{slog.Any("bs", json.RawMessage([]byte("1234")))},
 			wantText: `message bs="1234"`,
+		},
+		{
+			name:     "struct",
+			replace:  removeKeys(slog.TimeKey, slog.LevelKey),
+			attrs:    []slog.Attr{slog.Any("bs", TestStruct{
+							TestTime: testTime, 
+							TestString: testString,
+							TestInt: testInt,
+							TestDuration: testDuration,
+							TestError: testError,
+							testPrivateString: testString,})},
+			wantText: `message bs=TestStruct{TestTime=2000-01-02 03:04:05.000000006 +0000 UTC TestString="7e3b3b2aaeff56a7108fe11e154200dd/7819479873059528190" TestInt=32768 TestDuration=23000000000 TestError=fail }`,
 		},
 		{
 			name:    "inline group",

@@ -3,12 +3,14 @@ package cli
 import (
 	"context"
 	"encoding"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -395,17 +397,84 @@ func (h *Handler) appendValue(buf *buffer, v slog.Value) {
 		case encoding.TextMarshaler:
 			data, err := cv.MarshalText()
 			if err != nil {
-				break
+				buf.WriteByte('"')
+				buf.WriteByte('"')
+			} else {
+				appendQuote(buf, string(data))
 			}
-			appendQuote(buf, string(data))
 		case *slog.Source:
 			h.appendSource(buf, cv)
+		case json.RawMessage:
+			data, err := cv.MarshalJSON()
+			if err != nil {
+				buf.WriteByte('"')
+				buf.WriteByte('"')
+			} else  {
+				appendQuote(buf, string(data))
+			}
 		case []byte:
-			appendAutoQuote(buf, string(cv))
+			appendQuote(buf, string(cv))
 		default:
-			appendQuote(buf, fmt.Sprintf("%s", v.Any()))
+			switch t := reflect.TypeOf(cv); t.Kind() {
+			case reflect.Struct:
+				// appendString(buf, 
+				// 	fmt.Sprintf("%s=%+v",
+				// 		f.Name, v.Interface()))
+				appendStruct(buf, cv)
+
+				// buf.WriteByte('!')
+				// appendQuote(buf, fmt.Sprintf("%+v", cv))
+			default:
+				appendQuote(buf, fmt.Sprintf("%+v", cv))
+			}
+
 		}
 	}
+}
+
+func appendStruct(buf *buffer, cv any) {
+	sv := reflect.ValueOf(cv)
+	
+	// Check if it's a pointer and dereference if necessary
+	if sv.Kind() == reflect.Ptr {
+		appendStruct(buf, sv.Elem())
+		return
+	}
+
+	t := reflect.TypeOf(cv)
+	buf.WriteString(t.Name())
+	buf.WriteByte('{')
+	for i := 0; i < sv.NumField(); i++ {
+		f := sv.Type().Field(i)
+		if !f.IsExported() {
+			continue
+		}
+		buf.WriteString(f.Name)
+		buf.WriteByte('=')
+
+		v := sv.Field(i)
+		switch v.Kind() {
+		case reflect.String:
+			buf.WriteByte('"')
+			buf.WriteString(v.String())
+			buf.WriteByte('"')
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			buf.WriteString(strconv.FormatInt(v.Int(), 10))
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			buf.WriteString(strconv.FormatUint(v.Uint(), 10))
+		case reflect.Float32, reflect.Float64:
+			buf.WriteString(strconv.FormatFloat(v.Float(), 'f', 2, 64))
+		case reflect.Bool:
+			buf.WriteString(strconv.FormatBool(v.Bool()))
+		default:
+			appendString(buf, fmt.Sprintf("%+v", v.Interface()))
+		}
+
+		if i < sv.NumField() {
+			buf.WriteByte(' ')
+		}
+	}
+	buf.WriteByte('}')
 }
 
 func (h *Handler) appendError(buf *buffer, err error, attrKey, groupsPrefix string) {
